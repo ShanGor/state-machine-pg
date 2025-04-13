@@ -35,7 +35,7 @@ public class MainController {
         }
     }
 
-    @PostMapping("/statemachine/callback")
+    @PostMapping("/api/state-machine/callback")
     public ResponseEntity<String> statemachineCallback(@RequestBody String body, ServerHttpRequest request) {
         try {
             var correlationIdOpt = HttpUtil.tryGetHeader(HttpUtil.HEADER_CORRELATION_ID, request.getHeaders());

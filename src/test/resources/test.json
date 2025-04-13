@@ -1,0 +1,67 @@
+[
+  {
+    "nodeId": "1",
+    "first": true,
+    "nodeName": "start",
+    "nodeType": "START",
+    "fromState": "",
+    "toState": "started",
+    "stateFormula": "",
+    "subscribeTopic": "bus",
+    "publishTopic": "bus"
+  },
+  {
+    "nodeId": "2",
+    "nodeName": "General Knowledge BA",
+    "nodeType": "ACTION",
+    "fromState": "started",
+    "toState": "success-2",
+    "stateFormula": "",
+    "subscribeTopic": "bus",
+    "publishTopic": "bus",
+    "actionName": "LLM_AGENT"
+  },
+  {
+    "nodeId": "3",
+    "nodeName": "Market Research BA",
+    "nodeType": "ACTION",
+    "fromState": "success-2",
+    "toState": "success-3",
+    "stateFormula": "",
+    "subscribeTopic": "bus",
+    "publishTopic": "bus",
+    "actionName": "LLM_AGENT"
+  },
+  {
+    "nodeId": "4",
+    "nodeName": "UK Market BA",
+    "nodeType": "ACTION",
+    "fromState": "success-3",
+    "toState": "success-4",
+    "stateFormula": "",
+    "subscribeTopic": "bus",
+    "publishTopic": "bus",
+    "actionName": "LLM_AGENT"
+  },
+  {
+    "nodeId": "5",
+    "nodeName": "Quality BA",
+    "actionName": "LLM_AGENT",
+    "nodeType": "ACTION",
+    "fromState": "success-4",
+    "toState": "completed",
+    "stateFormula": "",
+    "subscribeTopic": "bus",
+    "publishTopic": "bus"
+  },
+  {
+    "nodeId": "6",
+    "nodeName": "end",
+    "nodeType": "END",
+    "fromState": "completed",
+    "toState": "",
+    "stateFormula": "",
+    "subscribeTopic": "bus",
+    "publishTopic": ""
+  }
+]

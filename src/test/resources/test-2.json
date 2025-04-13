@@ -1,0 +1,109 @@
+[
+  {
+    "nodeId": "1",
+    "first": true,
+    "nodeName": "start",
+    "nodeType": "START",
+    "fromState": "",
+    "toState": "started",
+    "stateFormula": "",
+    "subscribeTopic": "bus",
+    "publishTopic": "llm"
+  },
+  {
+    "nodeId": "2",
+    "nodeName": "General Knowledge BA",
+    "nodeType": "ACTION",
+    "fromState": "started",
+    "toState": "2-success",
+    "stateFormula": "",
+    "subscribeTopic": "llm",
+    "publishTopic": "bus",
+    "detail": {
+      "actionType": "LLM_AGENT",
+      "agentName": "General Knowledge BA"
+    }
+  },
+  {
+    "nodeId": "2-3",
+    "nodeName": "2-3 Transition",
+    "nodeType": "EDGE",
+    "fromState": "2-success",
+    "toState": "success-2",
+    "stateFormula": "",
+    "subscribeTopic": "bus",
+    "publishTopic": "llm"
+  },
+  {
+    "nodeId": "3",
+    "nodeName": "Market Research BA",
+    "nodeType": "ACTION",
+    "fromState": "success-2",
+    "toState": "3-success",
+    "stateFormula": "",
+    "subscribeTopic": "llm",
+    "publishTopic": "bus",
+    "detail": {
+      "actionType": "LLM_AGENT",
+      "agentName": "Market Research BA"
+    }
+  },
+  {
+    "nodeId": "3-4",
+    "nodeName": "3-4 Transition",
+    "nodeType": "EDGE",
+    "fromState": "3-success",
+    "toState": "success-3",
+    "stateFormula": "",
+    "subscribeTopic": "bus",
+    "publishTopic": "llm"
+  },
+  {
+    "nodeId": "4",
+    "nodeName": "UK Market BA",
+    "nodeType": "ACTION",
+    "fromState": "success-3",
+    "toState": "4-success",
+    "stateFormula": "",
+    "subscribeTopic": "llm",
+    "publishTopic": "bus",
+    "detail": {
+      "actionType": "LLM_AGENT",
+      "agentName": "UK Market BA"
+    }
+  },
+  {
+    "nodeId": "4-5",
+    "nodeName": "4-5 Transition",
+    "nodeType": "EDGE",
+    "fromState": "4-success",
+    "toState": "success-4",
+    "stateFormula": "",
+    "subscribeTopic": "bus",
+    "publishTopic": "llm"
+  },
+  {
+    "nodeId": "5",
+    "nodeName": "Quality BA",
+    "nodeType": "ACTION",
+    "fromState": "success-4",
+    "toState": "completed",
+    "stateFormula": "",
+    "subscribeTopic": "llm",
+    "publishTopic": "bus",
+    "detail": {
+      "actionType": "LLM_AGENT",
+      "agentName": "Quality BA"
+    }
+  },
+  {
+    "nodeId": "6",
+    "nodeName": "end",
+    "nodeType": "END",
+    "fromState": "completed",
+    "toState": "",
+    "stateFormula": "",
+    "subscribeTopic": "bus",
+    "publishTopic": ""
+  }
+]

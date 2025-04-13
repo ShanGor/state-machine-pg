@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: statemachine-postgres
+
+state:
+  pub-sub:
+    bus-topic: bus
+---
+spring:
+  config:
+    activate:
+      on-profile: local-pg
+
+  datasource:
+    url: jdbc:postgresql://localhost:15432/r1?reWriteBatchedInserts=true&stringtype=unspecified
+    username: rag
+    password: rag
+    hikari:
+      auto-commit: true
+      connection-timeout: 3000
+      idle-timeout: 600000
+      connection-test-query: select 1
+      minimum-idle: 5
+      maximum-pool-size: 32
+  jpa:
+    hibernate:
+      ddl-auto: none
+

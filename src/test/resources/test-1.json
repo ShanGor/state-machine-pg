@@ -1,0 +1,63 @@
+[
+  {
+    "nodeId": "1",
+    "first": true,
+    "nodeName": "start",
+    "nodeType": "START",
+    "fromState": "",
+    "toState": "started",
+    "stateFormula": "",
+    "subscribeTopic": "bus",
+    "publishTopic": "llm"
+  },
+  {
+    "nodeId": "2",
+    "nodeName": "agent 1",
+    "nodeType": "ACTION",
+    "fromState": "started",
+    "toState": "success_2",
+    "stateFormula": "",
+    "subscribeTopic": "llm",
+    "publishTopic": "bus"
+  },
+  {
+    "nodeId": "3",
+    "nodeName": "agent 2",
+    "nodeType": "ACTION",
+    "fromState": "started",
+    "toState": "success_3",
+    "stateFormula": "",
+    "subscribeTopic": "llm",
+    "publishTopic": "bus"
+  },
+  {
+    "nodeId": "4",
+    "nodeName": "agent 3",
+    "nodeType": "ACTION",
+    "fromState": "started",
+    "toState": "success_4",
+    "stateFormula": "",
+    "subscribeTopic": "llm",
+    "publishTopic": "bus"
+  },
+  {
+    "nodeId": "5",
+    "nodeName": "aggregate",
+    "nodeType": "CONDITION",
+    "fromState": "",
+    "toState": "",
+    "stateFormula": "success_2 & success_3 & success_4 => completed",
+    "subscribeTopic": "bus",
+    "publishTopic": "bus"
+  },
+  {
+    "nodeId": "6",
+    "nodeName": "end",
+    "nodeType": "END",
+    "fromState": "completed",
+    "toState": "",
+    "stateFormula": "",
+    "subscribeTopic": "bus",
+    "publishTopic": ""
+  }
+]

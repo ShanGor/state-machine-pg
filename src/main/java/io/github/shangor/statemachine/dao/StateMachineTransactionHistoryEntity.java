@@ -15,11 +15,15 @@ import java.util.Map;
     use_case_id varchar(37) NOT NULL,
     transaction_id varchar(37) not NULL,
 	event_name varchar(128) not null,
+    node_id varchar(37),
+    node_status varchar(64),
     state varchar(64),
 	payload jsonb NULL,
 	creation_time timestamp NULL DEFAULT CURRENT_TIMESTAMP,
 	last_update_time timestamp NULL DEFAULT CURRENT_TIMESTAMP
 );
+ CREATE INDEX sm_txn_hist_transaction_id_idx ON sm_txn_hist USING btree (transaction_id);
+
  */
 @Table(name = "sm_txn_hist")
 @Entity

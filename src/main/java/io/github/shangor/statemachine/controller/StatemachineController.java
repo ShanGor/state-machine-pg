@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.shangor.statemachine.event.GeneralEvent;
 import io.github.shangor.statemachine.service.PubSubService;
 import io.github.shangor.statemachine.task.MainFlowTask;
+import io.github.shangor.statemachine.util.ConcurrentUtil;
 import io.github.shangor.statemachine.util.HttpUtil;
 import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +19,7 @@ import java.util.concurrent.TimeUnit;
 @RestController
 @Slf4j
 @RequiredArgsConstructor
-public class MainController {
+public class StatemachineController {
     private final PubSubService pubSubService;
     private final MainFlowTask mainFlow;
     private final ObjectMapper objectMapper;
@@ -33,6 +34,11 @@ public class MainController {
         } catch (InterruptedException e) {
             log.error("Error while waiting for Statemachine consumer to close gracefully: {}", e.getMessage());
         }
+    }
+
+    @GetMapping("/api/state-machine/generate-id")
+    public String allocateTransactionId() {
+        return ConcurrentUtil.uuidV7().toString();
     }
 
     @PostMapping("/api/state-machine/callback")

@@ -22,7 +22,7 @@ import java.util.List;
 @Data
 @Table(name = "sm_control")
 @Entity
-public class StateMachineControlEntity {
+public class StatemachineControlEntity {
     @Id
     private String useCaseId;
     private String useCaseName;

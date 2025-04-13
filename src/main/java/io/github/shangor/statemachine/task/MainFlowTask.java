@@ -11,10 +11,12 @@ import io.github.shangor.statemachine.pojo.ConsumerRecord;
 import io.github.shangor.statemachine.pojo.UseCaseEventKey;
 import io.github.shangor.statemachine.service.PubSubService;
 import io.github.shangor.statemachine.service.StateMachineControlService;
+import io.github.shangor.statemachine.state.ActionHandlers;
 import io.github.shangor.statemachine.state.ActionNode;
 import io.github.shangor.statemachine.state.StateFlow;
 import io.github.shangor.statemachine.util.ConcurrentUtil;
 import io.github.shangor.statemachine.util.HttpUtil;
+import io.github.shangor.statemachine.util.JsonUtil;
 import io.github.shangor.statemachine.util.SecurityUtil;
 import io.github.shangor.state.StateUtil;
 import io.micrometer.common.util.StringUtils;
@@ -26,11 +28,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Timestamp;
 import java.sql.Types;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 @Slf4j
@@ -40,25 +42,37 @@ public class MainFlowTask {
     private final StateMachineControlService stateMachineControlService;
 
     private static final Map<String, Map<UseCaseEventKey, List<StateFlow>>> config = new HashMap<>();
-    public static Map<String, StateMachineControlEntity> useCaseInitials = new HashMap<>();
+
+    /**
+     * - key: useCaseName
+     * - value: StatemachineControlEntity
+     */
+    public static Map<String, StatemachineControlEntity> useCaseInitials = new HashMap<>();
+
+    /**
+     * nodeByPossibleState:
+     *  - key: useCaseId
+     *  - value:
+     *    - key: toState / possible target state which calculated by stateFormula
+     *    - value: list of StateFlow
+     */
+    public static Map<String, Map<String, List<StateFlow>>> nodeByPossibleState = new HashMap<>();
     public static volatile boolean isConfigInitialized = false;
     private static final TypeReference<Map<String, Boolean>> collectedStatesTypeRef = new TypeReference<>() {};
     private final JdbcTemplate jdbcTemplate;
-    private final StateMachineTransactionDetailRepository txnRepo;
-    private final StateMachineTransactionHistoryRepository histRepo;
+    private final StatemachineTransactionDetailRepository txnRepo;
+    private final StatemachineTransactionHistoryRepository histRepo;
     public static volatile boolean stopping = false;
     private final PubSubService pubSubService;
 
-    private static final ConcurrentHashMap<String, ActionNode> actionHandlers = new ConcurrentHashMap<>();
+    private final ActionHandlers actionHandlers;
+
+    private final StatemachineFlowStateRepository flowStateRepo;
 
     @Value("${state.pub-sub.bus-topic:bus}")
     @Setter
     @Getter
     private String busTopic;
-
-    public static void registerActionHandler(String name, ActionNode actionHandler) {
-        actionHandlers.put(name, actionHandler);
-    }
 
     @PostConstruct
     public void init() {
@@ -85,7 +99,6 @@ public class MainFlowTask {
             log.info("Config loaded to memory!");
 
             Thread.ofVirtual().start(this::subscribeAndRock);
-            Thread.ofVirtual().start(this::agentRocks);
 
         });
     }
@@ -118,88 +131,6 @@ public class MainFlowTask {
         }
     }
 
-    /**
-     * Pretend to be agents, and process the messages.
-     */
-    void agentRocks() {
-        var includeTopics = new HashSet<String>();
-        config.values().forEach(configItem -> {
-            configItem.forEach((key, items) -> {
-                items.forEach(item -> {
-                    if (StringUtils.isNotBlank(item.getSubscribeTopic())) {
-                        includeTopics.add(item.getSubscribeTopic());
-                    }
-                });
-            });
-        });
-        // remove the bus topic from the include topics
-        // config.keySet().forEach(includeTopics::remove);
-        includeTopics.remove(busTopic);
-
-        while(!stopping) {
-            try {
-                var messages = pubSubService.poll(includeTopics);
-                for(var msg : messages) {
-                    log.info("Agent processing message: {}", msg.getValue());
-                    ConcurrentUtil.runAsync(() -> {
-                        try {
-                            processAgent(msg);
-                        } catch (Exception e) {
-                            log.error("Agent error while processing message: {}", e.getMessage());
-                            e.printStackTrace();
-                        }
-                    });
-                }
-            } catch (Exception e) {
-                log.error("Agent error while polling/handling messages: {}", e.getMessage());
-                e.printStackTrace();
-            }
-        }
-    }
-
-    void processAgent(ConsumerRecord<String, String> msg) {
-        var payload = msg.getValue();
-        try {
-            var event = objectMapper.readValue(payload, GeneralEvent.class);
-
-            List<StateFlow> items = new LinkedList<>();
-            for (var flow : useCaseInitials.get(event.getUseCaseName()).getDetail()) {
-                if (event.getState().equals(flow.getFromState())) {
-                    items.add(flow);
-                }
-            }
-            if (items.isEmpty()) {
-                pubSubService.acknowledge(msg.getTopic(), msg.getId());
-                log.info("Agent: Not found the item {}.{}", event.getUseCaseId(), event.getNodeId());
-                return;
-            }
-
-            for (var item : items) {
-                ConcurrentUtil.runAsync(() -> {
-                    try {
-                        log.info("Agent: preprocessing {}- {}", event.getUseCaseName(), event.getEventName());
-
-                        log.info("Agent: processed {}- {}", event.getUseCaseName(), event.getEventName());
-
-                        event.setState(item.getToState());
-                        event.setNodeId(item.getNodeId());
-                        event.setEventName("%s.%s".formatted(event.getUseCaseName(), item.getToState()));
-                        publishEvent(item.getPublishTopic(), ConcurrentUtil.uuidV7().toString(), event);
-                    } catch (Exception e) {
-                        log.error("Error while processing agent message: {}", e.getMessage());
-                        e.printStackTrace();
-                    }
-
-                });
-
-            }
-
-            pubSubService.acknowledge(msg.getTopic(), msg.getId());
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
     void processMessage(ConsumerRecord<String, String> msg) {
         var topic = msg.getTopic();
         var payload = msg.getValue();
@@ -219,6 +150,7 @@ public class MainFlowTask {
                 pubSubService.acknowledge(msg.getTopic(), msg.getId());
                 return;
             }
+
             var toWrittenHistory = true;
             for (var item : items) {
                 Optional<Map<String, Object>> updatedEntity = Optional.empty();
@@ -235,8 +167,10 @@ public class MainFlowTask {
                 switch (item.getNodeType()) {
                     case ACTION -> {
                         log.info("Processing action {}", item.getActionName());
-                        var handler = actionHandlers.get(item.getActionName());
-                        if (handler == null) {
+                        ConcurrentUtil.runAsync(() -> updateFlowStatus(event, item, StatemachineFlowStateEntity.Status.RUNNING));
+
+                        var handler = actionHandlers.getActionHandler(item.getActionName());
+                        if (handler.isEmpty()) {
                             log.error("No handler found for action {}", item.getActionName());
                             pubSubService.acknowledge(msg.getTopic(), msg.getId());
                             return;
@@ -244,17 +178,24 @@ public class MainFlowTask {
                         var input = ActionNode.Param.builder().config(item).context(event.getDomainContext()).build();
 
                         try {
-                            var resp = handler.action(input);
+                            var resp = handler.get().action(input);
                             event.setDomainContext(resp);
+
+                            ConcurrentUtil.runAsync(() -> updateFlowStatus(event, item, StatemachineFlowStateEntity.Status.SUCCESS));
                         } catch (Exception e) {
                             log.error("Error while processing action message: {}", e.getMessage());
-                            // TODO, give it a failure state
+
+                            ConcurrentUtil.runAsync(() -> updateFlowStatus(event, item, StatemachineFlowStateEntity.Status.FAILED));
                         }
                     }
                     case HUMAN -> {
                         //TODO write to a human queue, and not transit state yet.
+                        ConcurrentUtil.runAsync(() -> updateFlowStatus(event, item, StatemachineFlowStateEntity.Status.RUNNING));
                         pubSubService.acknowledge(msg.getTopic(), msg.getId());
                         return;
+                    }
+                    default -> {
+                        ConcurrentUtil.runAsync(() -> updateFlowStatus(event, item, StatemachineFlowStateEntity.Status.UNKNOWN));
                     }
                 }
 
@@ -329,7 +270,48 @@ public class MainFlowTask {
         pubSubService.publishEvent(topic, id, objectMapper.writeValueAsString(event));
     }
 
-    void writeTransactionHistory(GeneralEvent event) throws JsonProcessingException {
+    public void updateFlowStatus(GeneralEvent event, StateFlow item, StatemachineFlowStateEntity.Status knownStatus) {
+        try {
+            String nodeStatus;
+            if (!knownStatus.equals(StatemachineFlowStateEntity.Status.UNKNOWN)) {
+                nodeStatus = knownStatus.toString();
+            } else {
+                switch (item.getNodeType()) {
+                    case START, END -> nodeStatus = "success";
+                    default -> {
+                        if (StringUtils.isBlank(event.getState())) {
+                            nodeStatus = "success";
+                        } else {
+                            var state = event.getState().toLowerCase(Locale.ROOT);
+                            if (state.contains("success") || state.contains("complete")) {
+                                nodeStatus = "success";
+                            } else if (state.contains("fail") || state.contains("error")) {
+                                nodeStatus = "failed";
+                            } else {
+                                nodeStatus = "default";
+                            }
+                        }
+                    }
+                }
+            }
+
+            var o = new StatemachineFlowStateEntity();
+            var id = new StatemachineFlowStateEntity.Id();
+            id.setTransactionId(event.getCorrelationId());
+            id.setUseCaseId(event.getUseCaseId());
+            id.setNodeId(item.getNodeId());
+            o.setId(id);
+            o.setState(nodeStatus);
+            o.setContext(JsonUtil.getObjectMapper().writeValueAsString(event.getDomainContext()));
+            flowStateRepo.save(o);
+        } catch (Exception e) {
+            log.error("Error updating flow status: {}", e.getMessage());
+        }
+
+    }
+
+    void writeTransactionHistory(GeneralEvent event) {
+
         var hist = new StateMachineTransactionHistoryEntity();
         hist.setId(ConcurrentUtil.uuidV7().toString());
         hist.setTransactionId(event.getCorrelationId());
@@ -342,7 +324,7 @@ public class MainFlowTask {
         histRepo.save(hist);
     }
 
-    Optional<Map<String, Object>> updateTransaction(GeneralEvent event, StateFlow item) throws JsonProcessingException {
+    Optional<Map<String, Object>> updateTransaction(GeneralEvent event, StateFlow item) {
         var sql = """
                update sm_txn_detail
                 set last_update_time=current_timestamp,
@@ -382,9 +364,9 @@ public class MainFlowTask {
                 .build();
     }
 
-    void createTransaction(GeneralEvent event, StateFlow item) throws JsonProcessingException {
+    void createTransaction(GeneralEvent event, StateFlow item) {
         var collectedStates = Map.of(event.getState(), true);
-        var o = new StateMachineTransactionDetailEntity();
+        var o = new StatemachineTransactionDetailEntity();
         o.setId(event.getCorrelationId());
         o.setUseCaseId(event.getUseCaseId());
         o.setCurrentState(event.getState());
@@ -396,7 +378,10 @@ public class MainFlowTask {
         txnRepo.save(o);
     }
 
-    void putConfigToMemory(StateMachineControlEntity useCase) {
+    void putConfigToMemory(StatemachineControlEntity useCase) {
+        var nodeByState = new HashMap<String, List<StateFlow>>();
+        nodeByPossibleState.put(useCase.getUseCaseId(), nodeByState);
+
         var details = useCase.getDetail();
         if (details != null && !details.isEmpty()) {
             for (var item : details) {
@@ -408,17 +393,44 @@ public class MainFlowTask {
                 var list = configItem.computeIfAbsent(key, k -> new LinkedList<>());
                 list.add(item);
 
+                var outputState = item.getToState();
+                if (StringUtils.isNotBlank(outputState)) {
+                    List<StateFlow> listNodes;
+                    if (!nodeByState.containsKey(outputState)) {
+                        listNodes = new LinkedList<StateFlow>();
+                        nodeByState.put(outputState, listNodes);
+                    } else {
+                        listNodes = nodeByState.get(outputState);
+                    }
+
+                    listNodes.add(item);
+                }
+
                 if (StringUtils.isNotBlank(item.getStateFormula())) {
                     var p =StateUtil.parseFormulaForInput(item.getStateFormula());
                     var variables = p.getLeft();
+                    var possibleOutputStates = p.getRight();
                     for (var v : variables) {
                         key = new UseCaseEventKey(useCase.getUseCaseId(), v.trim());
                         list = configItem.computeIfAbsent(key, k -> new LinkedList<>());
                         list.add(item);
                     }
+
+                    // The following is to add the possible output states to the nodeByState map
+                    for (var s : possibleOutputStates) {
+                        List<StateFlow> listNodes;
+                        if (!nodeByState.containsKey(s)) {
+                            listNodes = new LinkedList<>();
+                            nodeByState.put(s, listNodes);
+                        } else {
+                            listNodes = nodeByState.get(s);
+                        }
+                        listNodes.add(item);
+                    }
                 }
             }
         }
+
 
     }
 

@@ -2,14 +2,17 @@ package io.github.shangor.statemachine.task;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.github.shangor.statemachine.dao.StateMachineControlEntity;
-import io.github.shangor.statemachine.dao.StateMachineTransactionDetailRepository;
-import io.github.shangor.statemachine.dao.StateMachineTransactionHistoryRepository;
+import io.github.shangor.statemachine.dao.StatemachineControlEntity;
+import io.github.shangor.statemachine.dao.StatemachineFlowStateRepository;
+import io.github.shangor.statemachine.dao.StatemachineTransactionDetailRepository;
+import io.github.shangor.statemachine.dao.StatemachineTransactionHistoryRepository;
 import io.github.shangor.statemachine.event.GeneralEvent;
 import io.github.shangor.statemachine.pojo.ConsumerRecord;
 import io.github.shangor.statemachine.service.PubSubService;
 import io.github.shangor.statemachine.service.StateMachineControlService;
+import io.github.shangor.statemachine.state.ActionHandlers;
 import io.github.shangor.statemachine.state.StateFlow;
+import jakarta.annotation.Resource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -38,19 +41,25 @@ class MainFlowTaskTest {
     private PubSubService pubSubService;
 
     @Mock
-    private StateMachineTransactionHistoryRepository histRepo;
+    private StatemachineTransactionHistoryRepository histRepo;
 
     @Mock
-    private StateMachineTransactionDetailRepository txnRepo;
+    private StatemachineTransactionDetailRepository txnRepo;
 
     private MainFlowTask mainFlowTask;
+
+    @Resource
+    private ActionHandlers actionHandlers;
+
+    @Mock
+    private StatemachineFlowStateRepository flowStateRepo;
 
 
 
     @BeforeEach
     void setUp() {
         try(var m = MockitoAnnotations.openMocks(this)) {
-            mainFlowTask = new MainFlowTask(objectMapper, stateMachineControlService, jdbcTemplate, txnRepo, histRepo, pubSubService);
+            mainFlowTask = new MainFlowTask(objectMapper, stateMachineControlService, jdbcTemplate, txnRepo, histRepo, pubSubService, actionHandlers, flowStateRepo);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -90,7 +99,7 @@ class MainFlowTaskTest {
 
     @Test
     void testInit() throws InterruptedException {
-        var item = new StateMachineControlEntity();
+        var item = new StatemachineControlEntity();
         item.setUseCaseName("hello");
         when(stateMachineControlService.loadAll()).thenReturn(Flux.just(item));
         MainFlowTask.stopping = true;

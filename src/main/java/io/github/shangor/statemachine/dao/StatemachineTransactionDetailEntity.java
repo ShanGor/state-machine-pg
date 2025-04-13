@@ -29,7 +29,7 @@ import java.util.Map;
 @Table(name = "sm_txn_detail")
 @Data
 @Entity
-public class StateMachineTransactionDetailEntity {
+public class StatemachineTransactionDetailEntity {
     @Id
     private String id;
     private String useCaseId;

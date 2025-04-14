@@ -319,6 +319,7 @@ public class MainFlowTask {
         hist.setId(ConcurrentUtil.uuidV7().toString());
         hist.setTransactionId(event.getCorrelationId());
         hist.setEventName(event.getEventName());
+        hist.setEventType(event.getEventType().name());
         hist.setUseCaseId(event.getUseCaseId());
         hist.setState(event.getState());
         hist.setPayload(event.getDomainContext());

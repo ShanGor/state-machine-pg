@@ -15,6 +15,7 @@ import java.util.Map;
     use_case_id varchar(37) NOT NULL,
     transaction_id varchar(37) not NULL,
 	event_name varchar(128) not null,
+    event_type varchar(32) not null,
     state varchar(64),
 	payload jsonb NULL,
 	creation_time timestamp NULL DEFAULT CURRENT_TIMESTAMP,
@@ -32,6 +33,7 @@ public class StateMachineTransactionHistoryEntity {
     private String useCaseId;
     private String transactionId;
     private String eventName;
+    private String eventType;
     private String state;
     @Convert(converter = MapJsonConverter.class)
     private Map<String, Object> payload;

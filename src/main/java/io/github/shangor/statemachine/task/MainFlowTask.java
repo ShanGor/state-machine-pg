@@ -28,7 +28,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.Timestamp;
 import java.sql.Types;
@@ -153,6 +152,8 @@ public class MainFlowTask {
 
             var toWrittenHistory = true;
             for (var item : items) {
+                GeneralEvent.EventType eventType = GeneralEvent.EventType.ACTION_COMPLETED;
+
                 Optional<Map<String, Object>> updatedEntity = Optional.empty();
                 if (item.isFirst()) {
                     createTransaction(event, item);
@@ -167,7 +168,7 @@ public class MainFlowTask {
                 switch (item.getNodeType()) {
                     case ACTION -> {
                         log.info("Processing action {}", item.getActionName());
-                        ConcurrentUtil.runAsync(() -> updateFlowStatus(event, item, StatemachineFlowStateEntity.Status.RUNNING));
+                        updateFlowStatus(event, item, StatemachineFlowStateEntity.Status.RUNNING);
 
                         var handler = actionHandlers.getActionHandler(item.getActionName());
                         if (handler.isEmpty()) {
@@ -181,25 +182,26 @@ public class MainFlowTask {
                             var resp = handler.get().action(input);
                             event.setDomainContext(resp);
 
-                            ConcurrentUtil.runAsync(() -> updateFlowStatus(event, item, StatemachineFlowStateEntity.Status.SUCCESS));
+                            updateFlowStatus(event, item, StatemachineFlowStateEntity.Status.SUCCESS);
                         } catch (Exception e) {
                             log.error("Error while processing action message: {}", e.getMessage());
+                            eventType = GeneralEvent.EventType.ACTION_FAILED;
 
-                            ConcurrentUtil.runAsync(() -> updateFlowStatus(event, item, StatemachineFlowStateEntity.Status.FAILED));
+                            updateFlowStatus(event, item, StatemachineFlowStateEntity.Status.FAILED);
                         }
                     }
                     case HUMAN -> {
                         //TODO write to a human queue, and not transit state yet.
-                        ConcurrentUtil.runAsync(() -> updateFlowStatus(event, item, StatemachineFlowStateEntity.Status.RUNNING));
+                        updateFlowStatus(event, item, StatemachineFlowStateEntity.Status.RUNNING);
                         pubSubService.acknowledge(msg.getTopic(), msg.getId());
                         return;
                     }
                     default -> {
-                        ConcurrentUtil.runAsync(() -> updateFlowStatus(event, item, StatemachineFlowStateEntity.Status.UNKNOWN));
+                        updateFlowStatus(event, item, StatemachineFlowStateEntity.Status.UNKNOWN);
                     }
                 }
 
-                transitState(event, item, updatedEntity);
+                transitState(event, item, updatedEntity, eventType);
             }
 
             pubSubService.acknowledge(msg.getTopic(), msg.getId());
@@ -208,10 +210,10 @@ public class MainFlowTask {
         }
     }
 
-    GeneralEvent fromEventAndItem(GeneralEvent event,StateFlow item) {
+    GeneralEvent fromEventAndItem(GeneralEvent event,StateFlow item, GeneralEvent.EventType eventType) {
         var toState = item.getToState();
         var evt = new GeneralEvent();
-        evt.setEventType(GeneralEvent.EventType.ACTION_STARTED);
+        evt.setEventType(eventType);
         evt.setNodeId(item.getNodeId());
         evt.setCorrelationId(event.getCorrelationId());
         evt.setState(toState);
@@ -222,8 +224,8 @@ public class MainFlowTask {
         return evt;
     }
 
-    void transitState(GeneralEvent event, StateFlow item, Optional<Map<String, Object>> updatedEntity) throws JsonProcessingException {
-        var evt = fromEventAndItem(event, item);
+    void transitState(GeneralEvent event, StateFlow item, Optional<Map<String, Object>> updatedEntity, GeneralEvent.EventType eventType) throws JsonProcessingException {
+        var evt = fromEventAndItem(event, item, eventType);
         if (StringUtils.isNotBlank(item.getPublishTopic()) && StringUtils.isNotBlank(evt.getState())) {
             publishEvent(item.getPublishTopic(), ConcurrentUtil.uuidV7().toString(), evt);
         } else if (item.getApiCallConfig() != null) {
@@ -271,43 +273,44 @@ public class MainFlowTask {
     }
 
     public void updateFlowStatus(GeneralEvent event, StateFlow item, StatemachineFlowStateEntity.Status knownStatus) {
-        try {
-            String nodeStatus;
-            if (!knownStatus.equals(StatemachineFlowStateEntity.Status.UNKNOWN)) {
-                nodeStatus = knownStatus.toString();
-            } else {
-                switch (item.getNodeType()) {
-                    case START, END -> nodeStatus = "success";
-                    default -> {
-                        if (StringUtils.isBlank(event.getState())) {
-                            nodeStatus = "success";
-                        } else {
-                            var state = event.getState().toLowerCase(Locale.ROOT);
-                            if (state.contains("success") || state.contains("complete")) {
+        ConcurrentUtil.runAsync(() -> {
+            try {
+                String nodeStatus;
+                if (!knownStatus.equals(StatemachineFlowStateEntity.Status.UNKNOWN)) {
+                    nodeStatus = knownStatus.toString();
+                } else {
+                    switch (item.getNodeType()) {
+                        case START, END -> nodeStatus = "success";
+                        default -> {
+                            if (StringUtils.isBlank(event.getState())) {
                                 nodeStatus = "success";
-                            } else if (state.contains("fail") || state.contains("error")) {
-                                nodeStatus = "failed";
                             } else {
-                                nodeStatus = "default";
+                                var state = event.getState().toLowerCase(Locale.ROOT);
+                                if (state.contains("success") || state.contains("complete")) {
+                                    nodeStatus = "success";
+                                } else if (state.contains("fail") || state.contains("error")) {
+                                    nodeStatus = "failed";
+                                } else {
+                                    nodeStatus = "default";
+                                }
                             }
                         }
                     }
                 }
+
+                var o = new StatemachineFlowStateEntity();
+                var id = new StatemachineFlowStateEntity.Id();
+                id.setTransactionId(event.getCorrelationId());
+                id.setUseCaseId(event.getUseCaseId());
+                id.setNodeId(item.getNodeId());
+                o.setId(id);
+                o.setState(nodeStatus);
+                o.setContext(JsonUtil.getObjectMapper().writeValueAsString(event.getDomainContext()));
+                flowStateRepo.save(o);
+            } catch (Exception e) {
+                log.error("Error updating flow status: {}", e.getMessage());
             }
-
-            var o = new StatemachineFlowStateEntity();
-            var id = new StatemachineFlowStateEntity.Id();
-            id.setTransactionId(event.getCorrelationId());
-            id.setUseCaseId(event.getUseCaseId());
-            id.setNodeId(item.getNodeId());
-            o.setId(id);
-            o.setState(nodeStatus);
-            o.setContext(JsonUtil.getObjectMapper().writeValueAsString(event.getDomainContext()));
-            flowStateRepo.save(o);
-        } catch (Exception e) {
-            log.error("Error updating flow status: {}", e.getMessage());
-        }
-
+        });
     }
 
     void writeTransactionHistory(GeneralEvent event) {

@@ -83,7 +83,7 @@ class MainFlowTaskTest {
         item.setNodeName("TestUseCase");
 
         // Execute
-        GeneralEvent result = mainFlowTask.fromEventAndItem(event, item);
+        GeneralEvent result = mainFlowTask.fromEventAndItem(event, item, GeneralEvent.EventType.ACTION_STARTED);
 
         // Verify
         assertNotNull(result);

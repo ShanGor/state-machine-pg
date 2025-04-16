@@ -16,6 +16,7 @@ import io.github.shangor.statemachine.state.ActionNode;
 import io.github.shangor.statemachine.state.StateFlow;
 import io.github.shangor.statemachine.util.ConcurrentUtil;
 import io.github.shangor.statemachine.util.HttpUtil;
+import io.github.shangor.statemachine.util.JsonUtil;
 import io.github.shangor.statemachine.util.SecurityUtil;
 import io.github.shangor.state.StateUtil;
 import io.micrometer.common.util.StringUtils;
@@ -185,6 +186,7 @@ public class MainFlowTask {
                             log.error("Error while processing action message: {}", e.getMessage());
                             eventType = GeneralEvent.EventType.ACTION_FAILED;
                             event.setState("%s.failed".formatted(item.getNodeId()));
+                            event.setDomainContext(JsonUtil.getObjectMapper().writeValueAsString(Map.of("error", e.getMessage())));
                             updateFlowStatus(event, item, StatemachineFlowStateEntity.Status.FAILED);
                         }
                     }

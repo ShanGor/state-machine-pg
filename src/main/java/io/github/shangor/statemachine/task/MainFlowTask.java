@@ -26,6 +26,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
@@ -345,7 +346,7 @@ public class MainFlowTask {
                     event.getUseCaseId()
             };
             int[] types = new int[]{Types.VARCHAR, Types.LONGVARCHAR, Types.LONGVARCHAR, Types.VARCHAR, Types.VARCHAR};
-            var updatedEntity = jdbcTemplate.queryForMap(sql, args, types);
+            Map<String, Object> updatedEntity = jdbcTemplate.queryForMap(sql, args, types);
 
             log.info("Updated transaction {}.{} for {}.{}", event.getCorrelationId(), event.getUseCaseId(), event.getUseCaseName(), event.getState());
             return Optional.of(updatedEntity);

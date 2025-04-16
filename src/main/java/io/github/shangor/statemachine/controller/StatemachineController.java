@@ -78,13 +78,9 @@ public class StatemachineController {
         try {
             log.info("Found use case {}: {}", useCase, flowCase);
             var evt = new GeneralEvent();
-            if (firstItem.getNodeType() == Node.Type.START) {
-                evt.setEventType(GeneralEvent.EventType.ACTION_COMPLETED);
-                evt.setState(firstItem.getToState());
-            } else {
-                evt.setEventType(GeneralEvent.EventType.ACTION_STARTED);
-                evt.setState(firstItem.getFromState());
-            }
+            evt.setEventType(GeneralEvent.EventType.ACTION_STARTED);
+            evt.setState(firstItem.getFromState());
+
 
             evt.setNodeId(firstItem.getNodeId());
             evt.setUseCaseName(flowCase.getUseCaseName());

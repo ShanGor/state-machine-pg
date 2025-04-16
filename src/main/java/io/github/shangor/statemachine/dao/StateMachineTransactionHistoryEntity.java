@@ -35,8 +35,7 @@ public class StateMachineTransactionHistoryEntity {
     private String eventName;
     private String eventType;
     private String state;
-    @Convert(converter = MapJsonConverter.class)
-    private Map<String, Object> payload;
+    private String payload;
     private Timestamp creationTime;
     private Timestamp lastUpdateTime;
 }

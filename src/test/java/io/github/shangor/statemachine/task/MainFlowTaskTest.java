@@ -73,7 +73,7 @@ class MainFlowTaskTest {
         event.setCorrelationId("123");
         event.setUseCaseId("1");
         event.setState("START");
-        event.setDomainContext(new HashMap<>());
+        event.setDomainContext("{}");
         event.setUseCaseName("TestUseCase");
 
         var item = new StateFlow();

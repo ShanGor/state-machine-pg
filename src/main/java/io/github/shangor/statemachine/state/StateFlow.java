@@ -22,7 +22,7 @@ public class StateFlow {
      * The action registered in the action registry. Only required for ACTION and HUMAN nodes.
      */
     private String actionName;
-    private Map<String, String> detail;
+    private Map<String, Object> config;
     private String fromState;
     private String toState;
     private String stateFormula;

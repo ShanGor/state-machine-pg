@@ -6,7 +6,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import java.util.Map;
 
 @Configuration
 @Slf4j
@@ -17,7 +16,7 @@ public class StatemachineAutoConfig {
         var ah =  new ActionHandlers();
         ah.registerActionHandler("test", new ActionNode() {
             @Override
-            public Map<String, Object> action(Param input) {
+            public String action(Param input) {
                 log.info("Test Agent: {}", input.getConfig());
                 try {
                     Thread.sleep(1000);

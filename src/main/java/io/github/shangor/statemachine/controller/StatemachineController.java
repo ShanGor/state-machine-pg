@@ -13,7 +13,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.web.bind.annotation.*;
-import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 @RestController
@@ -85,7 +84,7 @@ public class StatemachineController {
             evt.setUseCaseId(flowCase.getUseCaseId());
             evt.setCorrelationId(correlationId);
             evt.setEventName("%s.%s".formatted(flowCase.getUseCaseName(), firstItem.getFromState()));
-            evt.setDomainContext(objectMapper.readValue(payload, Map.class));
+            evt.setDomainContext(payload);
             pubSubService.publishEvent(mainFlow.getBusTopic(), correlationId, objectMapper.writeValueAsString(evt));
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);

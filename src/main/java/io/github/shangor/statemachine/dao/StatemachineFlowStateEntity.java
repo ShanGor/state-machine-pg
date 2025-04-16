@@ -16,7 +16,7 @@ import java.sql.Timestamp;
     use_case_id varchar(37) NOT NULL,
  	node_id varchar(37) NOT NULL,
  	state varchar(64) NULL,
- 	context text NULL,
+ 	context jsonb NULL,
  	creation_time timestamp DEFAULT NOW() NULL,
  	last_update_time timestamp DEFAULT NOW() NULL
  );

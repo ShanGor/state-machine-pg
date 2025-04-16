@@ -5,8 +5,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.Map;
-
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -25,7 +23,7 @@ public abstract class ActionNode implements Node {
     @Builder
     public static class Param {
         private StateFlow config;
-        private Map<String, Object> context;
+        private String context;
     }
 
     @Override
@@ -33,5 +31,5 @@ public abstract class ActionNode implements Node {
         return Type.ACTION;
     }
 
-    public abstract Map<String, Object> action(Param input);
+    public abstract String action(Param input);
 }

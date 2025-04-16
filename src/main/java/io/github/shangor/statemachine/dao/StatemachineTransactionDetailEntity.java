@@ -38,8 +38,7 @@ public class StatemachineTransactionDetailEntity {
     private Map<String, Boolean> collectedStates;
     @Convert(converter = ActionDetails.ActionDetailsConverter.class)
     private ActionDetails actionDetails;
-    @Convert(converter = MapJsonConverter.class)
-    private Map<String, Object> domainContext;
+    private String domainContext;
     @CreationTimestamp
     private Timestamp creationTime;
     @UpdateTimestamp

@@ -16,7 +16,6 @@ import io.github.shangor.statemachine.state.ActionNode;
 import io.github.shangor.statemachine.state.StateFlow;
 import io.github.shangor.statemachine.util.ConcurrentUtil;
 import io.github.shangor.statemachine.util.HttpUtil;
-import io.github.shangor.statemachine.util.JsonUtil;
 import io.github.shangor.statemachine.util.SecurityUtil;
 import io.github.shangor.state.StateUtil;
 import io.micrometer.common.util.StringUtils;
@@ -234,10 +233,7 @@ public class MainFlowTask {
             var resultOpt = HttpUtil.post(url, objectMapper.writeValueAsString(evt), apiCallConfig.isAsync());
             if (resultOpt.isPresent()) { // Synchronous API call
                 var resp = objectMapper.readValue(resultOpt.get(), LinkedHashMap.class);
-                var ctx = new HashMap<String, Object>();
-                ctx.putAll(event.getDomainContext());
-                ctx.putAll(resp);
-                evt.setDomainContext(ctx);
+                evt.setDomainContext(event.getDomainContext());
                 updateTransaction(evt, item);
 
                 publishEvent(busTopic, ConcurrentUtil.uuidV7().toString(), evt);
@@ -305,7 +301,7 @@ public class MainFlowTask {
                 id.setNodeId(item.getNodeId());
                 o.setId(id);
                 o.setState(nodeStatus);
-                o.setContext(JsonUtil.getObjectMapper().writeValueAsString(event.getDomainContext()));
+                o.setContext(event.getDomainContext());
                 flowStateRepo.save(o);
             } catch (Exception e) {
                 log.error("Error updating flow status: {}", e.getMessage());
@@ -342,7 +338,7 @@ public class MainFlowTask {
         try {
             var args = new Object[]{
                     event.getState(),
-                    objectMapper.writeValueAsString(event.getDomainContext()),
+                    event.getDomainContext(),
                     objectMapper.writeValueAsString(composeActionDetails(item)),
                     event.getCorrelationId(),
                     event.getUseCaseId()

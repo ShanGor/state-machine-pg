@@ -2,8 +2,6 @@ package io.github.shangor.statemachine.event;
 
 import lombok.Data;
 
-import java.util.Map;
-
 @Data
 public class GeneralEvent {
     public enum EventType {
@@ -16,7 +14,7 @@ public class GeneralEvent {
     private String nodeId;
     private String useCaseName;
     private String state;
-    private Map<String, Object> domainContext;
+    private String domainContext;
     private long timestamp;
 
     public GeneralEvent() {

@@ -180,12 +180,11 @@ public class MainFlowTask {
                         try {
                             var resp = handler.get().action(input);
                             event.setDomainContext(resp);
-
                             updateFlowStatus(event, item, StatemachineFlowStateEntity.Status.SUCCESS);
                         } catch (Exception e) {
                             log.error("Error while processing action message: {}", e.getMessage());
                             eventType = GeneralEvent.EventType.ACTION_FAILED;
-
+                            event.setState("%s.failed".formatted(item.getNodeId()));
                             updateFlowStatus(event, item, StatemachineFlowStateEntity.Status.FAILED);
                         }
                     }

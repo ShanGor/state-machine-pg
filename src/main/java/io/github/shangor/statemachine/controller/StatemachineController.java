@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.shangor.statemachine.event.GeneralEvent;
 import io.github.shangor.statemachine.service.PubSubService;
+import io.github.shangor.statemachine.state.Node;
 import io.github.shangor.statemachine.task.MainFlowTask;
 import io.github.shangor.statemachine.util.ConcurrentUtil;
 import io.github.shangor.statemachine.util.HttpUtil;
@@ -55,7 +56,7 @@ public class StatemachineController {
     }
 
     @PostMapping("/api/state-machine/{useCase}")
-    public ResponseEntity<?> test(@RequestBody String payload,
+    public ResponseEntity<?> submitCase(@RequestBody String payload,
                                @PathVariable String useCase,
                                ServerHttpRequest request) {
         var correlationIdOpt = HttpUtil.tryGetHeader(HttpUtil.HEADER_CORRELATION_ID, request.getHeaders());
@@ -77,8 +78,14 @@ public class StatemachineController {
         try {
             log.info("Found use case {}: {}", useCase, flowCase);
             var evt = new GeneralEvent();
-            evt.setEventType(GeneralEvent.EventType.ACTION_STARTED);
-            evt.setState(firstItem.getFromState());
+            if (firstItem.getNodeType() == Node.Type.START) {
+                evt.setEventType(GeneralEvent.EventType.ACTION_COMPLETED);
+                evt.setState(firstItem.getToState());
+            } else {
+                evt.setEventType(GeneralEvent.EventType.ACTION_STARTED);
+                evt.setState(firstItem.getFromState());
+            }
+
             evt.setNodeId(firstItem.getNodeId());
             evt.setUseCaseName(flowCase.getUseCaseName());
             evt.setUseCaseId(flowCase.getUseCaseId());

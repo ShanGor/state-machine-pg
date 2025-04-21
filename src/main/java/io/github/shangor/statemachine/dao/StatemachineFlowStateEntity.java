@@ -40,26 +40,6 @@ public class StatemachineFlowStateEntity {
     @UpdateTimestamp
     private Timestamp lastUpdateTime;
 
-
-    public enum Status {
-        RUNNING ("running"), FAILED ("failed"), SUCCESS ("success"), DEFAULT ("default"), UNKNOWN("unknown");
-
-        private final String name;
-
-        Status(String s) {
-            name = s;
-        }
-
-        public boolean equalsName(String otherName) {
-            // (otherName == null) check is not needed because name.equals(null) returns false
-            return name.equals(otherName);
-        }
-
-        public String toString() {
-            return this.name;
-        }
-    }
-
     @Data
     @Embeddable
     public static class Id implements Serializable {

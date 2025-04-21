@@ -26,10 +26,18 @@ public abstract class ActionNode implements Node {
         private String context;
     }
 
+    @Data
+    @Builder
+    public static class Output {
+        private String context;
+        private String overriddenStatus;
+        private String extraMessage;
+    }
+
     @Override
     public Type getType() {
         return Type.ACTION;
     }
 
-    public abstract String action(Param input);
+    public abstract Output action(Param input);
 }

@@ -16,7 +16,7 @@ public class StatemachineAutoConfig {
         var ah =  new ActionHandlers();
         ah.registerActionHandler("test", new ActionNode() {
             @Override
-            public String action(Param input) {
+            public Output action(Param input) {
                 log.info("Test Agent: {}", input.getConfig());
                 try {
                     Thread.sleep(1000);
@@ -24,7 +24,7 @@ public class StatemachineAutoConfig {
                     log.error("InterruptedException: {}", e.getMessage());
                 }
 
-                return input.getContext();
+                return Output.builder().context(input.getContext()).build();
             }
         });
         return ah;

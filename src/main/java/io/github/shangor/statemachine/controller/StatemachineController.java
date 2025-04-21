@@ -4,7 +4,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.shangor.statemachine.event.GeneralEvent;
 import io.github.shangor.statemachine.service.PubSubService;
-import io.github.shangor.statemachine.state.Node;
 import io.github.shangor.statemachine.task.MainFlowTask;
 import io.github.shangor.statemachine.util.ConcurrentUtil;
 import io.github.shangor.statemachine.util.HttpUtil;
@@ -78,10 +77,7 @@ public class StatemachineController {
         try {
             log.info("Found use case {}: {}", useCase, flowCase);
             var evt = new GeneralEvent();
-            evt.setEventType(GeneralEvent.EventType.ACTION_STARTED);
             evt.setState(firstItem.getFromState());
-
-
             evt.setNodeId(firstItem.getNodeId());
             evt.setUseCaseName(flowCase.getUseCaseName());
             evt.setUseCaseId(flowCase.getUseCaseId());

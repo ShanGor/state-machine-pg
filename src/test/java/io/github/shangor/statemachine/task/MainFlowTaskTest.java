@@ -11,6 +11,7 @@ import io.github.shangor.statemachine.pojo.ConsumerRecord;
 import io.github.shangor.statemachine.service.PubSubService;
 import io.github.shangor.statemachine.service.StateMachineControlService;
 import io.github.shangor.statemachine.state.ActionHandlers;
+import io.github.shangor.statemachine.state.NodeStatus;
 import io.github.shangor.statemachine.state.StateFlow;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.BeforeEach;
@@ -83,7 +84,7 @@ class MainFlowTaskTest {
         item.setNodeName("TestUseCase");
 
         // Execute
-        GeneralEvent result = mainFlowTask.fromEventAndItem(event, item, GeneralEvent.EventType.ACTION_STARTED);
+        GeneralEvent result = mainFlowTask.fromEventAndItem(event, item, NodeStatus.RUNNING);
 
         // Verify
         assertNotNull(result);
@@ -93,7 +94,6 @@ class MainFlowTaskTest {
         assertEquals("1", result.getUseCaseId());
         assertEquals("TestUseCase", result.getUseCaseName());
         assertEquals("TestUseCase.END", result.getEventName());
-        assertEquals(GeneralEvent.EventType.ACTION_STARTED, result.getEventType());
         assertEquals(event.getDomainContext(), result.getDomainContext());
     }
 

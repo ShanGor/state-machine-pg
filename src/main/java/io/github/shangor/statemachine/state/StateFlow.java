@@ -24,7 +24,14 @@ public class StateFlow {
     private String actionName;
     private Map<String, Object> config;
     private String fromState;
+    /**
+     * success by default
+     */
     private String toState;
+    /**
+     * some other states like failure, timeout, cancelled, etc.
+     */
+    private List<String> otherStates;
     private String stateFormula;
     private String subscribeTopic;
     private String publishTopic;

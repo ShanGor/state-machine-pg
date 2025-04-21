@@ -13,6 +13,7 @@ import io.github.shangor.statemachine.service.PubSubService;
 import io.github.shangor.statemachine.service.StateMachineControlService;
 import io.github.shangor.statemachine.state.ActionHandlers;
 import io.github.shangor.statemachine.state.ActionNode;
+import io.github.shangor.statemachine.state.NodeStatus;
 import io.github.shangor.statemachine.state.StateFlow;
 import io.github.shangor.statemachine.util.ConcurrentUtil;
 import io.github.shangor.statemachine.util.HttpUtil;
@@ -26,7 +27,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
@@ -153,7 +153,7 @@ public class MainFlowTask {
 
             var toWrittenHistory = true;
             for (var item : items) {
-                GeneralEvent.EventType eventType = GeneralEvent.EventType.ACTION_COMPLETED;
+                String eventType = NodeStatus.SUCCESS;
 
                 Optional<Map<String, Object>> updatedEntity = Optional.empty();
                 if (item.isFirst()) {
@@ -169,7 +169,7 @@ public class MainFlowTask {
                 switch (item.getNodeType()) {
                     case ACTION -> {
                         log.info("Processing action {}", item.getActionName());
-                        updateFlowStatus(event, item, StatemachineFlowStateEntity.Status.RUNNING);
+                        updateFlowStatus(event, item, NodeStatus.RUNNING);
 
                         var handler = actionHandlers.getActionHandler(item.getActionName());
                         if (handler.isEmpty()) {
@@ -181,23 +181,28 @@ public class MainFlowTask {
 
                         try {
                             var resp = handler.get().action(input);
-                            event.setDomainContext(resp);
-                            updateFlowStatus(event, item, StatemachineFlowStateEntity.Status.SUCCESS);
+                            event.setDomainContext(resp.getContext());
+                            if (StringUtils.isNotBlank(resp.getOverriddenStatus())) {
+                                eventType = resp.getOverriddenStatus();
+                                updateFlowStatus(event, item, eventType);
+                            } else {
+                                updateFlowStatus(event, item, NodeStatus.SUCCESS);
+                            }
                         } catch (Exception e) {
                             log.error("Error while processing action message: {}", e.getMessage());
-                            eventType = GeneralEvent.EventType.ACTION_FAILED;
+                            eventType = NodeStatus.FAILED;
                             event.setDomainContext(JsonUtil.getObjectMapper().writeValueAsString(Map.of("error", e.getMessage())));
-                            updateFlowStatus(event, item, StatemachineFlowStateEntity.Status.FAILED);
+                            updateFlowStatus(event, item, NodeStatus.FAILED);
                         }
                     }
                     case HUMAN -> {
                         //TODO write to a human queue, and not transit state yet.
-                        updateFlowStatus(event, item, StatemachineFlowStateEntity.Status.RUNNING);
+                        updateFlowStatus(event, item, NodeStatus.RUNNING);
                         pubSubService.acknowledge(msg.getTopic(), msg.getId());
                         return;
                     }
                     default -> {
-                        updateFlowStatus(event, item, StatemachineFlowStateEntity.Status.UNKNOWN);
+                        updateFlowStatus(event, item, NodeStatus.UNKNOWN);
                     }
                 }
 
@@ -210,13 +215,21 @@ public class MainFlowTask {
         }
     }
 
-    GeneralEvent fromEventAndItem(GeneralEvent event,StateFlow item, GeneralEvent.EventType eventType) {
-        var toState = item.getToState();
-        if (GeneralEvent.EventType.ACTION_FAILED.equals(eventType)) {
-            toState = "%s.failed".formatted(item.getNodeId());
+    GeneralEvent fromEventAndItem(GeneralEvent event,StateFlow item, String eventType) {
+        String toState;
+        switch (eventType) {
+            case NodeStatus.FAILED -> {
+                toState = "%s.failed".formatted(item.getNodeId());
+            }
+            case NodeStatus.SUCCESS -> {
+                toState = item.getToState();
+            }
+            default -> {
+                toState = eventType;
+            }
         }
+
         var evt = new GeneralEvent();
-        evt.setEventType(eventType);
         evt.setNodeId(item.getNodeId());
         evt.setCorrelationId(event.getCorrelationId());
         evt.setState(toState);
@@ -227,7 +240,7 @@ public class MainFlowTask {
         return evt;
     }
 
-    void transitState(GeneralEvent event, StateFlow item, Optional<Map<String, Object>> updatedEntity, GeneralEvent.EventType eventType) throws JsonProcessingException {
+    void transitState(GeneralEvent event, StateFlow item, Optional<Map<String, Object>> updatedEntity, String eventType) throws JsonProcessingException {
         var evt = fromEventAndItem(event, item, eventType);
         if (StringUtils.isNotBlank(item.getPublishTopic()) && StringUtils.isNotBlank(evt.getState())) {
             publishEvent(item.getPublishTopic(), ConcurrentUtil.uuidV7().toString(), evt);
@@ -272,12 +285,12 @@ public class MainFlowTask {
         pubSubService.publishEvent(topic, id, objectMapper.writeValueAsString(event));
     }
 
-    public void updateFlowStatus(GeneralEvent event, StateFlow item, StatemachineFlowStateEntity.Status knownStatus) {
+    public void updateFlowStatus(GeneralEvent event, StateFlow item, String knownStatus) {
         ConcurrentUtil.runAsync(() -> {
             try {
                 String nodeStatus;
-                if (!knownStatus.equals(StatemachineFlowStateEntity.Status.UNKNOWN)) {
-                    nodeStatus = knownStatus.toString();
+                if (StringUtils.isNotBlank(knownStatus) && !NodeStatus.UNKNOWN.equals(knownStatus)) {
+                    nodeStatus = knownStatus;
                 } else {
                     switch (item.getNodeType()) {
                         case START, END -> nodeStatus = "success";
@@ -314,12 +327,10 @@ public class MainFlowTask {
     }
 
     void writeTransactionHistory(GeneralEvent event) {
-
         var hist = new StateMachineTransactionHistoryEntity();
         hist.setId(ConcurrentUtil.uuidV7().toString());
         hist.setTransactionId(event.getCorrelationId());
         hist.setEventName(event.getEventName());
-        hist.setEventType(event.getEventType().name());
         hist.setUseCaseId(event.getUseCaseId());
         hist.setState(event.getState());
         hist.setPayload(event.getDomainContext());

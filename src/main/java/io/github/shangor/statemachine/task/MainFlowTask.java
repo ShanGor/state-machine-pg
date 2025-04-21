@@ -186,7 +186,6 @@ public class MainFlowTask {
                         } catch (Exception e) {
                             log.error("Error while processing action message: {}", e.getMessage());
                             eventType = GeneralEvent.EventType.ACTION_FAILED;
-                            event.setState("%s.failed".formatted(item.getNodeId()));
                             event.setDomainContext(JsonUtil.getObjectMapper().writeValueAsString(Map.of("error", e.getMessage())));
                             updateFlowStatus(event, item, StatemachineFlowStateEntity.Status.FAILED);
                         }
@@ -213,6 +212,9 @@ public class MainFlowTask {
 
     GeneralEvent fromEventAndItem(GeneralEvent event,StateFlow item, GeneralEvent.EventType eventType) {
         var toState = item.getToState();
+        if (GeneralEvent.EventType.ACTION_FAILED.equals(eventType)) {
+            toState = "%s.failed".formatted(item.getNodeId());
+        }
         var evt = new GeneralEvent();
         evt.setEventType(eventType);
         evt.setNodeId(item.getNodeId());
